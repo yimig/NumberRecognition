@@ -256,16 +256,13 @@ namespace NumberRecognition.Model.NeuronNet
                 Connections[i].WeightMatrix = Connections[i].WeightMatrix - wm[i];
                 Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - bm[i];
             }
+            weightMatrixList=new List<Matrix<double>[]>();
+            biasesMatrixList=new List<Matrix<double>[]>();
         }
 
-
-        /// <summary>
-        /// 你有毛病？1总是不降？
-        /// </summary>
-        /// <param name="matrixList"></param>
-        /// <returns></returns>
         private List<Matrix<double>> AverageMatrix(List<Matrix<double>[]> matrixList)
         {
+
             List<Matrix<double>> resList=new List<Matrix<double>>();
             for (int i = 0; i < LCount + 1; i++)
             {

@@ -18,6 +18,7 @@ namespace NumberRecognition
     class Program
     {
 
+        private const int STEP = 10;
         private static FormChanger formChanger;
         static void Main(string[] args)
         {
@@ -26,7 +27,7 @@ namespace NumberRecognition
             formChanger = new FormChanger(form);
             (new Thread(formChanger.RunForm)).Start();
             //LearnOnce(0);
-           BeginLearning(0);
+            BeginLearning(0);
             //RunCmd2("shutdown", "-p");
             Console.ReadLine();
         }
@@ -56,15 +57,15 @@ namespace NumberRecognition
             var ImageBatch = new ImageBatch(DataReader.ReadTrainImage());
             var LabelBatch = new LabelBatch(DataReader.ReadTrainLabel());
             var net = ResultWriter.ReadResult();
-            for (int x = startPos/100; x < 600; x++)
+            for (int x = startPos/STEP; x < (60000/STEP); x++)
             {
-                ResultWriter.WriteLog("start:" + x * 100 + " to " + (x * 100 + 100) + "\n");
+                ResultWriter.WriteLog("start:" + x * STEP + " to " + (x * STEP + STEP) + "\n");
                 for (; ; )
                 {
                     var e=Learn(ImageBatch, LabelBatch, x, net);
-                    if (e / 100 < 0.01)
+                    if (e / STEP < 0.01)
                     {
-                        ResultWriter.WriteLog("cost:" + e / 100 + "\n");
+                        ResultWriter.WriteLog("cost:" + e / STEP + "\n");
                         break;
                     }
                 }
@@ -75,26 +76,26 @@ namespace NumberRecognition
         {
             int CorrectNum = 0;
             double e = 0;
-            for (int i = x * 100; i < x * 100 + 100; i++)
+            for (int i = x * STEP; i < x * STEP + STEP; i++)
             {
-                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+i+"/"+imb.Count()+")");
-                Console.WriteLine("index:" + (i + 1)+"  Load Picture");
+                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")");
+                //Console.WriteLine("index:" + (i + 1)+"  Load Picture");
                 net.LoadSource(imb[i], lab[i]);
-                Console.WriteLine("index:" + (i + 1) + "  Begin Reason");
+                //Console.WriteLine("index:" + (i + 1) + "  Begin Reason");
                 var res=net.BeginReason();
                 var cost=net.Evaluation();
-                Console.WriteLine("Ans:"+(res?"Correct": "Wrong")+"!");
-                Console.WriteLine("Cost:"+cost);
-                Console.WriteLine("index:" + (i + 1)+"  Begin Recall");
+                // Console.WriteLine("Ans:"+(res?"Correct": "Wrong")+"!");
+                // Console.WriteLine("Cost:"+cost);
+                // Console.WriteLine("index:" + (i + 1)+"  Begin Recall");
                 net.Recall();
                 e += cost;
                 if (res) CorrectNum++;
             }
-            Console.WriteLine("Average Cost:" + e / 100);
-            Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/100);
-            Console.WriteLine("Learn Updating");
+            Console.WriteLine("Average Cost:" + e / STEP);
+            //Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
+            //Console.WriteLine("Learn Updating");
             net.Update();
-            Console.WriteLine("Saving Statue");
+            //Console.WriteLine("Saving Statue");
             ResultWriter.WriteResult(net);
             return e;
         }
