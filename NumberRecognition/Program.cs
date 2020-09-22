@@ -25,9 +25,30 @@ namespace NumberRecognition
             var form = new ImageForm();
             formChanger = new FormChanger(form);
             (new Thread(formChanger.RunForm)).Start();
-            BeginLearning(0);
-            RunCmd2("shutdown", "-p");
+            //LearnOnce(0);
+           BeginLearning(0);
+            //RunCmd2("shutdown", "-p");
             Console.ReadLine();
+        }
+
+        private static void LearnOnce(int pos)
+        {
+            var net = ResultWriter.ReadResult();
+            var imb = new ImageBatch(DataReader.ReadTrainImage());
+            var lab = new LabelBatch(DataReader.ReadTrainLabel());
+            net.LoadSource(imb[pos], lab[pos]);
+            formChanger.ChangeImage(imb[pos].GetBitmap(),lab[pos]+"");
+            for (;;)
+            {
+                var res = net.BeginReason();
+                Console.WriteLine(net.Evaluation());
+                var loss=net.Recall();
+                Console.WriteLine("5-Active:"+net.Layers[3][5].Active);
+                // Console.WriteLine("1-loss:" + loss[1]);
+                // Console.WriteLine("5-Active:" + net.Layers[3][5].Active);
+                // Console.WriteLine("5-loss:" + loss[5]);
+                net.Update();
+            }
         }
 
         private static void BeginLearning(int startPos)
@@ -40,9 +61,8 @@ namespace NumberRecognition
                 ResultWriter.WriteLog("start:" + x * 100 + " to " + (x * 100 + 100) + "\n");
                 for (; ; )
                 {
-                    double e = 0;
-                    Learn(ImageBatch, LabelBatch, x, e, net);
-                    if (e / 100 < 1)
+                    var e=Learn(ImageBatch, LabelBatch, x, net);
+                    if (e / 100 < 0.01)
                     {
                         ResultWriter.WriteLog("cost:" + e / 100 + "\n");
                         break;
@@ -51,15 +71,16 @@ namespace NumberRecognition
             }
         }
 
-        private static void Learn(ImageBatch imb,LabelBatch lab,int x,double e,Net net)
+        private static double Learn(ImageBatch imb,LabelBatch lab,int x,Net net)
         {
             int CorrectNum = 0;
+            double e = 0;
             for (int i = x * 100; i < x * 100 + 100; i++)
             {
                 formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+i+"/"+imb.Count()+")");
                 Console.WriteLine("index:" + (i + 1)+"  Load Picture");
                 net.LoadSource(imb[i], lab[i]);
-                Console.WriteLine("index:" + (i + 1) + "    Begin Reason");
+                Console.WriteLine("index:" + (i + 1) + "  Begin Reason");
                 var res=net.BeginReason();
                 var cost=net.Evaluation();
                 Console.WriteLine("Ans:"+(res?"Correct": "Wrong")+"!");
@@ -75,6 +96,7 @@ namespace NumberRecognition
             net.Update();
             Console.WriteLine("Saving Statue");
             ResultWriter.WriteResult(net);
+            return e;
         }
 
         private static void BuildNewNet()

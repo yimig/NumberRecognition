@@ -116,10 +116,10 @@ namespace NumberRecognition.Model.NeuronNet
             {
                 if (i == ans)
                 {
-                    res+=Math.Pow(Layers[LCount + 1][i].Active, 2);
+                    res+=Math.Pow(1 - Layers[LCount + 1][i].Active, 2);
                     continue;
                 }
-                res+=Math.Pow(1 - Layers[LCount + 1][i].Active, 2);
+                res+=Math.Pow(Layers[LCount + 1][i].Active, 2);
             }
 
             return res;
@@ -158,10 +158,10 @@ namespace NumberRecognition.Model.NeuronNet
             {
                 if (i == ans)
                 {
-                    lossList.Add(2*Layers[LCount + 1][i].Active);
+                    lossList.Add(2*(Layers[LCount + 1][i].Active-1));
                     continue;
                 }
-                lossList.Add(2*(Layers[LCount + 1][i].Active - 1 ));
+                lossList.Add(2*(Layers[LCount + 1][i].Active));
             }
 
             return lossList;
@@ -228,13 +228,14 @@ namespace NumberRecognition.Model.NeuronNet
             return biasesMatrix; 
         }
 
-        public void Recall()
+        public List<double> Recall()
         {
             Matrix<double>[] weightMatrices = new Matrix<double>[LCount + 1];
             Matrix<double>[] biasesMatrices = new Matrix<double>[LCount + 1];
-            CalculateNeuron(LCount + 1, CalculateResultLoss());
-            weightMatrices[LCount]=CalculateWeight(LCount + 1, CalculateResultLoss());
-            biasesMatrices[LCount]=CalculateBiases(LCount + 1, CalculateResultLoss());
+            List<double> loss = CalculateResultLoss();
+            CalculateNeuron(LCount + 1, loss);
+            weightMatrices[LCount]=CalculateWeight(LCount + 1, loss);
+            biasesMatrices[LCount]=CalculateBiases(LCount + 1, loss);
             for (int i = LCount; i > 0; i--)
             {
                 CalculateNeuron(i,GetMidLoss(i));
@@ -243,6 +244,7 @@ namespace NumberRecognition.Model.NeuronNet
             }
             weightMatrixList.Add(weightMatrices);
             biasesMatrixList.Add(biasesMatrices);
+            return loss;
         }
 
         public void Update()
@@ -256,6 +258,12 @@ namespace NumberRecognition.Model.NeuronNet
             }
         }
 
+
+        /// <summary>
+        /// 你有毛病？1总是不降？
+        /// </summary>
+        /// <param name="matrixList"></param>
+        /// <returns></returns>
         private List<Matrix<double>> AverageMatrix(List<Matrix<double>[]> matrixList)
         {
             List<Matrix<double>> resList=new List<Matrix<double>>();
@@ -268,7 +276,6 @@ namespace NumberRecognition.Model.NeuronNet
 
                 resList.Add(matrixList[0][i] / matrixList.Count);
             }
-
             return resList;
         }
     }
