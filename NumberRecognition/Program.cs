@@ -41,14 +41,15 @@ namespace NumberRecognition
             formChanger.ChangeImage(imb[pos].GetBitmap(),lab[pos]+"");
             for (;;)
             {
-                var res = net.BeginReason();
+                int say;
+                var res = net.BeginReason(out say);
                 Console.WriteLine(net.Evaluation());
                 var loss=net.Recall();
                 Console.WriteLine("5-Active:"+net.Layers[3][5].Active);
                 // Console.WriteLine("1-loss:" + loss[1]);
                 // Console.WriteLine("5-Active:" + net.Layers[3][5].Active);
                 // Console.WriteLine("5-loss:" + loss[5]);
-                net.Update();
+                net.Update(1);
             }
         }
 
@@ -79,24 +80,28 @@ namespace NumberRecognition
             for (int i = x * STEP; i < x * STEP + STEP; i++)
             {
                 formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")");
-                //Console.WriteLine("index:" + (i + 1)+"  Load Picture");
+                Console.WriteLine("index:" + (i + 1)+"  Load Picture");
                 net.LoadSource(imb[i], lab[i]);
-                //Console.WriteLine("index:" + (i + 1) + "  Begin Reason");
-                var res=net.BeginReason();
+                Console.WriteLine("index:" + (i + 1) + "  Begin Reason");
+                int say;
+                var res=net.BeginReason(out say);
                 var cost=net.Evaluation();
-                // Console.WriteLine("Ans:"+(res?"Correct": "Wrong")+"!");
-                // Console.WriteLine("Cost:"+cost);
-                // Console.WriteLine("index:" + (i + 1)+"  Begin Recall");
+
+                Console.WriteLine("Ans:"+(res?"Correct": "Wrong")+"!    Say: "+say);
+                Console.WriteLine("Cost:"+cost);
+                Console.WriteLine("index:" + (i + 1)+"  Begin Recall");
                 net.Recall();
                 e += cost;
                 if (res) CorrectNum++;
             }
+            Console.WriteLine("=================================");
             Console.WriteLine("Average Cost:" + e / STEP);
-            //Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
-            //Console.WriteLine("Learn Updating");
-            net.Update();
-            //Console.WriteLine("Saving Statue");
+            Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
+            Console.WriteLine("Learn Updating");
+            net.Update(1);
+            Console.WriteLine("Saving Statue");
             ResultWriter.WriteResult(net);
+            Console.WriteLine("=================================");
             return e;
         }
 
