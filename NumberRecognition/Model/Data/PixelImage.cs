@@ -10,7 +10,7 @@ using NumberRecognition.Model.NeuronNet;
 
 namespace NumberRecognition.Model.Data
 {
-    class PixelImage
+    public class PixelImage
     {
         private int rows, columns;
         private byte[] data;

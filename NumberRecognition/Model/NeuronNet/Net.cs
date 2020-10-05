@@ -10,7 +10,7 @@ using NumberRecognition.Model.Data;
 
 namespace NumberRecognition.Model.NeuronNet
 {
-    class Net
+    public class Net
     {
         [JsonProperty("layers")] public List<Layer> Layers;
         [JsonProperty("lCount")]public int LCount { get; set; }

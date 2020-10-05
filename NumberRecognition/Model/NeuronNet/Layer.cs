@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace NumberRecognition.Model.NeuronNet
 {
-    class Layer
+    public class Layer
     {
         [JsonProperty("neurons")] public List<Neuron> Neurons;
 

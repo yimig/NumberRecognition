@@ -9,7 +9,7 @@ using Newtonsoft.Json;
 
 namespace NumberRecognition.Model.NeuronNet
 {
-    class Connection
+    public class Connection
     {
         [JsonProperty("weightMatrix")]
         public double[][] JsonWeightMatrix
