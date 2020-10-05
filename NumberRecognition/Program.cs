@@ -18,11 +18,11 @@ namespace NumberRecognition
     class Program
     {
 
-        private const int STEP = 100;
+        private const int STEP = 2;
         private static FormChanger formChanger;
         static void Main(string[] args)
         {
-            //BuildNewNet();
+            BuildNewNet();
             var form = new ImageForm();
             formChanger = new FormChanger(form);
             (new Thread(formChanger.RunForm)).Start();
@@ -38,7 +38,7 @@ namespace NumberRecognition
             var imb = new ImageBatch(DataReader.ReadTrainImage());
             var lab = new LabelBatch(DataReader.ReadTrainLabel());
             net.LoadSource(imb[pos], lab[pos]);
-            formChanger.ChangeImage(imb[pos].GetBitmap(),lab[pos]+"",net);
+            formChanger.ChangeImage(imb[pos].GetBitmap(),lab[pos]+"");
             for (;;)
             {
                 int say;
@@ -79,25 +79,25 @@ namespace NumberRecognition
             double e = 0;
             for (int i = x * STEP; i < x * STEP + STEP; i++)
             {
-                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")",net);
+                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")");
                 formChanger.SetInfo("index:" + (i + 1)+"  Load Picture");
                 net.LoadSource(imb[i], lab[i]);
                 formChanger.SetInfo("index:" + (i + 1) + "  Begin Reason");
                 int say;
                 var res=net.BeginReason(out say);
                 var cost=net.Evaluation();
-
                 formChanger.SetInfo("Ans:"+(res?"Correct": "Wrong")+"!    Say: "+say);
                 formChanger.SetInfo("Cost:"+cost);
                 formChanger.SetInfo("index:" + (i + 1)+"  Begin Recall");
+                formChanger.AddNeuronNote(net, lab[i], say, cost);
                 net.Recall();
                 e += cost;
                 if (res) CorrectNum++;
             }
             //Console.WriteLine("=================================");
             Console.WriteLine("Average Cost:" + e / STEP);
-            formChanger.AddCost(e/STEP);
             Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
+            formChanger.AddCost(e / STEP, Convert.ToDouble(CorrectNum) / STEP);
             Console.WriteLine("Learn Updating");
             net.Update(1);
             Console.WriteLine("Saving Statue");
@@ -164,9 +164,9 @@ namespace NumberRecognition
                 Application.Run(form);
             }
 
-            public void ChangeImage(Bitmap pic, string title,Net net)
+            public void ChangeImage(Bitmap pic, string title)
             {
-                form.SetNumber(pic, title,net);
+                form.SetNumber(pic, title);
             }
 
             public void SetInfo(string info)
@@ -174,9 +174,14 @@ namespace NumberRecognition
                 form.SetInfo(info);
             }
 
-            public void AddCost(double cost)
+            public void AddCost(double cost,double accuracy)
             {
-                form.AddCost(cost);
+                form.AddCost(cost, accuracy);
+            }
+
+            public void AddNeuronNote(Net net, int testNum, int sayNum, double cost)
+            {
+                form.AddNeuronNote(net,testNum,sayNum,cost);
             }
         }
     }

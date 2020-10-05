@@ -15,12 +15,14 @@ namespace NumberRecognition
     public partial class ImageForm : Form
     {
         private Label[] lbLayer1, lbLayer2, lbLayer3;
+        private Chart[] subCharts;
 
         public ImageForm()
         {
             InitializeComponent();
             InitLabelLayers();
-            InitChart();
+            InitMainChart();
+            InitSubCharts();
         }
 
         private void InitLabelLayers()
@@ -41,53 +43,122 @@ namespace NumberRecognition
             };
         }
 
-        private void InitChart()
+        private void InitMainChart()
         {
-            // 定义图表区域
-            this.ctCost.ChartAreas.Clear();
-            ChartArea chartArea1 = new ChartArea("C1");
-            this.ctCost.ChartAreas.Add(chartArea1);
-            //定义存储和显示点的容器
-            this.ctCost.Series.Clear();
-            Series series1 = new Series("Average Cost");
-            series1.ChartArea = "C1";
-            this.ctCost.Series.Add(series1);
-            //设置图表显示样式
-            this.ctCost.ChartAreas[0].AxisY.Minimum = 0;
-            this.ctCost.ChartAreas[0].AxisY.Maximum = 1;
-            this.ctCost.ChartAreas[0].AxisX.Interval = 10;
-            this.ctCost.ChartAreas[0].AxisX.MajorGrid.LineColor = System.Drawing.Color.Silver;
-            this.ctCost.ChartAreas[0].AxisY.MajorGrid.LineColor = System.Drawing.Color.Silver;
+            ctCost.Series.Clear();
+            var area = AddChartArea(20,4, ctCost,"C1");
+            AddChartSeries(ctCost,area, "Average Cost", Color.Red);
+            AddChartSeries(ctCost,area, "Accuracy", Color.DarkBlue);
             //设置标题
             this.ctCost.Titles.Clear();
             this.ctCost.Titles.Add("S01");
             this.ctCost.Titles[0].Text = "Cost Table";
             this.ctCost.Titles[0].ForeColor = Color.RoyalBlue;
             this.ctCost.Titles[0].Font = new System.Drawing.Font("Microsoft Sans Serif", 12F);
-            //设置图表显示样式
-            this.ctCost.Series[0].ChartType = SeriesChartType.Line;
-            //this.ctCost.Series[0].ChartType = SeriesChartType.Spline;
-            this.ctCost.Series[0].Color = Color.Red;
-            this.ctCost.Series[0].Points.Clear();
-
         }
 
-        public void AddCost(double cost)
+        private void InitSubCharts()
+        {
+            subCharts = new[] {chart1, chart2, chart3, chart4, chart5, chart6, chart7, chart8, chart9, chart10};
+            for (int i = 0; i < subCharts.Length; i++)
+            {
+                InitSubChart(subCharts[i],i);
+            }
+        }
+
+        private void InitSubChart(Chart chart,int id)
+        {
+            chart.Series.Clear();
+            var area = AddChartArea(50,5, chart,"C1");
+            AddChartSeries(chart,area, "Cost", Color.Red);
+            AddChartSeries(chart,area, "Confidence", Color.BlueViolet);
+            AddChartSeries(chart, area, "AWC", Color.Black);
+            //设置标题
+            chart.Titles.Clear();
+            chart.Titles.Add("S01");
+            chart.Titles[0].Text = "Number "+id;
+            chart.Titles[0].ForeColor = Color.RoyalBlue;
+            chart.Titles[0].Font = new System.Drawing.Font("Microsoft Sans Serif", 12F);
+        }
+
+        private ChartArea AddChartArea(int intervalX,int maxY,Chart chart,string name)
+        {
+            // 定义图表区域
+            ChartArea area = new ChartArea(name);
+            chart.ChartAreas.Add(area);
+            area.AxisY.Minimum = 0;
+            area.AxisY.Maximum = maxY;
+            area.AxisX.Interval = intervalX;
+            area.AxisX.MajorGrid.LineColor = System.Drawing.Color.Silver;
+            area.AxisY.MajorGrid.LineColor = System.Drawing.Color.Silver;
+            // Zoom into the X axis
+            area.AxisY.ScaleView.Zoom(2, 3);
+
+            // Enable range selection and zooming end user interface
+            area.CursorY.IsUserEnabled = true;
+            area.CursorY.IsUserSelectionEnabled = true;
+            area.AxisY.ScaleView.Zoomable = true;
+
+            //将滚动内嵌到坐标轴中
+            area.AxisY.ScrollBar.IsPositionedInside = true;
+
+            // 设置滚动条的大小
+            area.AxisY.ScrollBar.Size = 10;
+
+            // 设置滚动条的按钮的风格，下面代码是将所有滚动条上的按钮都显示出来
+            area.AxisY.ScrollBar.ButtonStyle = ScrollBarButtonStyles.All;
+
+            // 设置自动放大与缩小的最小量
+            area.AxisY.ScaleView.SmallScrollSize = double.NaN;
+            area.AxisY.ScaleView.SmallScrollMinSize = 2;
+            return area;
+        }
+
+        private Series AddChartSeries(Chart chart,ChartArea area,string name,Color color)
+        {
+            Series series = new Series(name);
+            series.ChartArea = area.Name;
+            chart.Series.Add(series);
+            series.ChartType = SeriesChartType.Line;
+            series.Color = color;
+            return series;
+        }
+
+        private void AssignDataToSubChart(Net net, int testNum, double cost)
+        {
+            subCharts[testNum].Series[0].Points.AddY(cost);
+            subCharts[testNum].Series[1].Points.AddY(net.Layers[3][testNum].Active);
+            double sum=0;
+            for (int i = 0; i < 10; i++)
+            {
+                if(i==testNum)continue;
+                sum += net.Layers[3][i].Active;
+            }
+
+            subCharts[testNum].Series[2].Points.AddY(sum / 9);
+        }
+
+        public void AddCost(double cost,double accuracy)
         {
             this.Invoke(new EventHandler(delegate
             {
                 ctCost.Series[0].Points.AddY(cost);
+                ctCost.Series[1].Points.AddY(accuracy);
             }));
         }
 
-        public void SetNumber(Bitmap numPic,string title,Net net)
+        public void SetNumber(Bitmap numPic,string title)
         {
             this.Invoke(new EventHandler(delegate
             {
                 this.pictureBox.Image = numPic;
                 this.Text = title;
-                AddNeuronNote(net);
             }));
+        }
+
+        private void ImageForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            Application.Exit();
         }
 
         public void SetInfo(string info)
@@ -98,20 +169,31 @@ namespace NumberRecognition
             }));
         }
 
-        public void AddNeuronNote(Net net)
+        public void AddNeuronNote(Net net,int testNum,int sayNum, double cost)
         {
-            for (int i = 0; i < 16; i++)
+            this.Invoke(new EventHandler(delegate
             {
-                lbLayer1[i].Text = net.Layers[1][i].ToString(4);
-            }
-            for (int i = 0; i < 16; i++)
-            {
-                lbLayer2[i].Text = net.Layers[2][i].ToString(4);
-            }
-            for (int i = 0; i < 10; i++)
-            {
-                lbLayer3[i].Text = net.Layers[3][i].ToString(4);
-            }
+                for (int i = 0; i < 16; i++)
+                {
+                    lbLayer1[i].Text = net.Layers[1][i].ToString(4);
+                }
+                for (int i = 0; i < 16; i++)
+                {
+                    lbLayer2[i].Text = net.Layers[2][i].ToString(4);
+                }
+                for (int i = 0; i < 10; i++)
+                {
+                    lbLayer3[i].Text = net.Layers[3][i].ToString(4);
+                }
+
+                foreach (var lb in lbLayer3)
+                {
+                    lb.BackColor = SystemColors.Control;
+                }
+                lbLayer3[sayNum].BackColor = Color.IndianRed;
+                lbLayer3[testNum].BackColor = Color.LightGreen;
+                AssignDataToSubChart(net,testNum,cost);
+            }));
         }
     }
 }
