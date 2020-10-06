@@ -49,7 +49,7 @@ namespace NumberRecognition
                 // Console.WriteLine("1-loss:" + loss[1]);
                 // Console.WriteLine("5-Active:" + net.Layers[3][5].Active);
                 // Console.WriteLine("5-loss:" + loss[5]);
-                net.Update(1);
+                net.Update(0.05,Net.UpdateOptimizer.Adam);
             }
         }
 
@@ -58,6 +58,7 @@ namespace NumberRecognition
             var ImageBatch = new ImageBatch(DataReader.ReadTrainImage());
             var LabelBatch = new LabelBatch(DataReader.ReadTrainLabel());
             var net = ResultWriter.ReadResult();
+            net.InitMomentumLists();
             for (int x = startPos/STEP; x < (60000/STEP); x++)
             {
                 ResultWriter.WriteLog("start:" + x * STEP + " to " + (x * STEP + STEP) + "\n");
@@ -99,7 +100,7 @@ namespace NumberRecognition
             Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
             formChanger.AddCost(e / STEP, Convert.ToDouble(CorrectNum) / STEP);
             Console.WriteLine("Learn Updating");
-            net.Update(1);
+            net.Update(0.05,Net.UpdateOptimizer.Adam);
             Console.WriteLine("Saving Statue");
             ResultWriter.WriteResult(net);
             Console.WriteLine("=================================");

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MathNet.Numerics.LinearAlgebra;
 using NumberRecognition.Model.Data;
+using NumberRecognition.Util;
 
 namespace NumberRecognition.Model.NeuronNet
 {
@@ -21,6 +22,11 @@ namespace NumberRecognition.Model.NeuronNet
         private int ans;
         private List<Matrix<double>[]> weightMatrixList;
         private List<Matrix<double>[]> biasesMatrixList;
+        private List<Matrix<double>> preWeightMomentumList, preBiasesMomentumList;
+        private const double BETA1 = 0.9;
+        private List<Matrix<double>> preSecWeightMomentumList, preSecBiasesMomentumList;
+        private const double BETA2 = 0.999;
+        private const double SMOOTH_VALUE = 1e-8;
 
         /// <summary>
         /// 为json数据载入预留，勿调用
@@ -51,6 +57,7 @@ namespace NumberRecognition.Model.NeuronNet
             ResultNum = resultNum;
             BuildLayer();
             BuildConnection();
+            InitMomentumLists();
         }
 
         private void BuildLayer()
@@ -315,21 +322,164 @@ namespace NumberRecognition.Model.NeuronNet
             return loss;
         }
 
-        /// <summary>
-        /// 对上次更新值之后所有的回溯结果进行整合并更新
-        /// </summary>
-        /// <param name="multiple">更新倍率</param>
-        public void Update(double multiple)
+        public void InitMomentumLists()
+        {
+            preWeightMomentumList=new List<Matrix<double>>();
+            preBiasesMomentumList=new List<Matrix<double>>();
+            preSecWeightMomentumList=new List<Matrix<double>>();
+            preSecBiasesMomentumList=new List<Matrix<double>>();
+            for (int i = 0; i < LCount + 1; i++)
+            {
+                var mWeight = Matrix<double>.Build.Dense(Layers[i + 1].Count, Layers[i].Count);
+                var mBiases = Matrix<double>.Build.Dense(Layers[i + 1].Count, 1);
+                preWeightMomentumList.Add(mWeight);
+                preSecWeightMomentumList.Add(mWeight);
+                preBiasesMomentumList.Add(mBiases);
+                preSecBiasesMomentumList.Add(mBiases);
+            }
+        }
+
+        private Matrix<double> MatrixItemDivision(Matrix<double> dividend, Matrix<double> divisor)
+        {
+            for (int i = 0; i < divisor.ColumnCount; i++)
+            {
+                for (int j = 0; j < divisor.RowCount; j++)
+                {
+                    dividend[j, i] = dividend[j, i] / divisor[j, i];
+                }
+            }
+
+            return dividend;
+        }
+
+        private Matrix<double> MatrixItemPow(Matrix<double> m, int pow)
+        {
+            for (int i = 0; i < m.ColumnCount; i++)
+            {
+                for (int j = 0; j < m.RowCount; j++)
+                {
+                    m[j, i] = Math.Pow(m[j, i], pow);
+                }
+            }
+
+            return m;
+        }
+
+        private Matrix<double> MatrixItemSqrt(Matrix<double> m)
+        {
+            for (int i = 0; i < m.ColumnCount; i++)
+            {
+                for (int j = 0; j < m.RowCount; j++)
+                {
+                    m[j, i] = Math.Sqrt(m[j, i]);
+                }
+            }
+
+            return m;
+        }
+
+        private void CalculateMomentum(Matrix<double> gWeight,Matrix<double> gBiases,int index)
+        {
+            preWeightMomentumList[index] = BETA1 * preWeightMomentumList[index]+(1 - BETA1) * gWeight;
+            preBiasesMomentumList[index] = BETA1 * preBiasesMomentumList[index] + (1 - BETA1) * gBiases;
+        }
+
+        private void CalculateSecondOrderMomentum(Matrix<double> vWeight,Matrix<double> vBiases,int index)
+        {
+            preSecWeightMomentumList[index] = BETA2 * preSecWeightMomentumList[index] + (1 - BETA2) * MatrixItemPow(vWeight,2);
+            preSecBiasesMomentumList[index] = BETA2 * preSecBiasesMomentumList[index] + (1 - BETA2) * MatrixItemPow(vBiases,2);
+        }
+
+        private void SGDUpdate(double learningRate)
         {
             var wm = AverageMatrix(weightMatrixList);
             var bm = AverageMatrix(biasesMatrixList);
             for (int i = 0; i < wm.Count; i++)
             {
-                Connections[i].WeightMatrix = Connections[i].WeightMatrix - multiple*wm[i];
-                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - multiple*bm[i];
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate*wm[i];
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate*bm[i];
             }
             weightMatrixList=new List<Matrix<double>[]>();
             biasesMatrixList=new List<Matrix<double>[]>();
+        }
+
+        private void AdamUpdate(double learningRate)
+        {
+            var wm = AverageMatrix(weightMatrixList);
+            var bm = AverageMatrix(biasesMatrixList);
+            for (int i = 0; i < wm.Count; i++)
+            {
+                CalculateMomentum(wm[i],bm[i],i);
+                CalculateSecondOrderMomentum(wm[i],bm[i],i);
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate*(MatrixItemDivision(preWeightMomentumList[i],Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * (MatrixItemDivision(preBiasesMomentumList[i] ,Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+            }
+            //清空平均矩阵资源
+            weightMatrixList = new List<Matrix<double>[]>();
+            biasesMatrixList = new List<Matrix<double>[]>();
+        }
+
+        private void MomentumUpdate(double learningRate)
+        {
+            var wm = AverageMatrix(weightMatrixList);
+            var bm = AverageMatrix(biasesMatrixList);
+            for (int i = 0; i < wm.Count; i++)
+            {
+                CalculateMomentum(wm[i], bm[i], i);
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate * preWeightMomentumList[i];
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * preBiasesMomentumList[i];
+            }
+            //清空平均矩阵资源
+            weightMatrixList = new List<Matrix<double>[]>();
+            biasesMatrixList = new List<Matrix<double>[]>();
+        }
+
+        private void AdaGradUpdate(double learningRate)
+        {
+            var wm = AverageMatrix(weightMatrixList);
+            var bm = AverageMatrix(biasesMatrixList);
+            for (int i = 0; i < wm.Count; i++)
+            {
+                preSecWeightMomentumList[i] += MatrixItemPow(wm[i],2);
+                preSecBiasesMomentumList[i] += MatrixItemPow(bm[i],2);
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate * (MatrixItemDivision(wm[i], Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * (MatrixItemDivision(bm[i], Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+            }
+            //清空平均矩阵资源
+            weightMatrixList = new List<Matrix<double>[]>();
+            biasesMatrixList = new List<Matrix<double>[]>();
+        }
+
+        private void RMSpropUpdate(double learningRate)
+        {
+            var wm = AverageMatrix(weightMatrixList);
+            var bm = AverageMatrix(biasesMatrixList);
+            for (int i = 0; i < wm.Count; i++)
+            {
+                CalculateSecondOrderMomentum(wm[i], bm[i], i);
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate * (MatrixItemDivision(wm[i], Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * (MatrixItemDivision(bm[i], Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+            }
+            //清空平均矩阵资源
+            weightMatrixList = new List<Matrix<double>[]>();
+            biasesMatrixList = new List<Matrix<double>[]>();
+        }
+
+        /// <summary>
+        /// 对上次更新值之后所有的回溯结果进行整合并更新
+        /// </summary>
+        /// <param name="learningRate">更新倍率</param>
+        /// <param name="optimizer">指定优化算法</param>
+        public void Update(double learningRate, UpdateOptimizer optimizer)
+        {
+            switch (optimizer)
+            {
+                case UpdateOptimizer.SGD: SGDUpdate(learningRate); break;
+                case UpdateOptimizer.Adam: AdamUpdate(learningRate); break;
+                case UpdateOptimizer.Momentum:MomentumUpdate(learningRate);break;
+                case UpdateOptimizer.RMSprop:RMSpropUpdate(learningRate);break;
+                case UpdateOptimizer.AdaGrad: AdaGradUpdate(learningRate); break;
+            }
         }
 
         /// <summary>
@@ -351,6 +501,11 @@ namespace NumberRecognition.Model.NeuronNet
                 resList.Add(matrixList[0][i] / matrixList.Count);
             }
             return resList;
+        }
+
+        public enum UpdateOptimizer
+        {
+            SGD,Adam,Momentum,RMSprop,AdaGrad
         }
     }
 }

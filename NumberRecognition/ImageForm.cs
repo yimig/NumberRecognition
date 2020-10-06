@@ -46,7 +46,7 @@ namespace NumberRecognition
         private void InitMainChart()
         {
             ctCost.Series.Clear();
-            var area = AddChartArea(20,4, ctCost,"C1");
+            var area = AddChartArea(1000,5, ctCost,"C1");
             AddChartSeries(ctCost,area, "Average Cost", Color.Red);
             AddChartSeries(ctCost,area, "Accuracy", Color.DarkBlue);
             //设置标题
@@ -69,7 +69,7 @@ namespace NumberRecognition
         private void InitSubChart(Chart chart,int id)
         {
             chart.Series.Clear();
-            var area = AddChartArea(50,5, chart,"C1");
+            var area = AddChartArea(10000,5, chart,"C1");
             AddChartSeries(chart,area, "Cost", Color.Red);
             AddChartSeries(chart,area, "Confidence", Color.BlueViolet);
             AddChartSeries(chart, area, "AWC", Color.Black);
@@ -91,8 +91,8 @@ namespace NumberRecognition
             area.AxisX.Interval = intervalX;
             area.AxisX.MajorGrid.LineColor = System.Drawing.Color.Silver;
             area.AxisY.MajorGrid.LineColor = System.Drawing.Color.Silver;
-            // Zoom into the X axis
-            area.AxisY.ScaleView.Zoom(2, 3);
+            // Zoom into the Y axis
+            //area.AxisY.ScaleView.Zoom(2, 3);
 
             // Enable range selection and zooming end user interface
             area.CursorY.IsUserEnabled = true;

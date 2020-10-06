@@ -9,7 +9,23 @@ namespace NumberRecognition.Model.NeuronNet
 {
     public class Neuron
     {
-        [JsonProperty("active")]public double Active { get; set; }
+        private double active;
+        [JsonProperty("active")]
+        public double Active
+        {
+            get => active;
+            set
+            {
+                if (Double.IsNaN(value))
+                {
+                    active = 0;
+                }
+                else
+                {
+                    active = value;
+                }
+            }
+        }
 
         public Neuron()
         {
@@ -23,7 +39,7 @@ namespace NumberRecognition.Model.NeuronNet
 
         public override string ToString()
         {
-            return Active.ToString();
+            return active.ToString();
         }
 
         /// <summary>
