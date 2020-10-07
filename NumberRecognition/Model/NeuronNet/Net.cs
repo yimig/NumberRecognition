@@ -25,7 +25,7 @@ namespace NumberRecognition.Model.NeuronNet
         private List<Matrix<double>> preWeightMomentumList, preBiasesMomentumList;
         private const double BETA1 = 0.9;
         private List<Matrix<double>> preSecWeightMomentumList, preSecBiasesMomentumList;
-        private const double BETA2 = 0.999;
+        private const double BETA2 = 0.99;
         private const double SMOOTH_VALUE = 1e-8;
 
         /// <summary>
@@ -151,7 +151,7 @@ namespace NumberRecognition.Model.NeuronNet
         /// <returns></returns>
         private Matrix<double> PushOneLayer(Layer layer, Connection conn)
         {
-            var res = conn.WeightMatrix.Multiply(layer.ToMatrix()) + conn.BiasesMatrix;
+            var res = conn.WeightMatrix*layer.ToMatrix() + conn.BiasesMatrix;
             return SigmoidMatrix(res);
         }
 
@@ -189,6 +189,26 @@ namespace NumberRecognition.Model.NeuronNet
         {
             return Math.Pow(Math.E, -num) / Math.Pow(1 + Math.Pow(Math.E, -num), 2);
         }
+
+        // private static Matrix<double> ReLUMatrix(Matrix<double> matrix)
+        // {
+        //     for (int i = 0; i < matrix.RowCount; i++)
+        //     {
+        //         matrix[i, 0] = ReLU(matrix[i, 0]);
+        //     }
+        //
+        //     return matrix;
+        // }
+        //
+        // private static double ReLU(double num)
+        // {
+        //     return num < 0 ? 0 : num;
+        // }
+        //
+        // private static double DerivativeOfReLU(double num)
+        // {
+        //     return num < 0 ? 0 : 1;
+        // }
 
         /// <summary>
         /// 求得最后一层的期望差
@@ -365,18 +385,18 @@ namespace NumberRecognition.Model.NeuronNet
             return m;
         }
 
-        private Matrix<double> MatrixItemSqrt(Matrix<double> m)
-        {
-            for (int i = 0; i < m.ColumnCount; i++)
-            {
-                for (int j = 0; j < m.RowCount; j++)
-                {
-                    m[j, i] = Math.Sqrt(m[j, i]);
-                }
-            }
-
-            return m;
-        }
+        // private Matrix<double> MatrixItemRemoveNaN(Matrix<double> m)
+        // {
+        //     for (int i = 0; i < m.ColumnCount; i++)
+        //     {
+        //         for (int j = 0; j < m.RowCount; j++)
+        //         {
+        //             if(Double.IsNaN(m[j, i]))m[j,i] = 0;
+        //         }
+        //     }
+        //
+        //     return m;
+        // }
 
         private void CalculateMomentum(Matrix<double> gWeight,Matrix<double> gBiases,int index)
         {
@@ -403,20 +423,35 @@ namespace NumberRecognition.Model.NeuronNet
             biasesMatrixList=new List<Matrix<double>[]>();
         }
 
-        private void AdamUpdate(double learningRate)
+        /// <summary>
+        /// 未完成，暂不可使用
+        /// </summary>
+        /// <param name="learningRate"></param>
+        /// <returns></returns>
+        public Dictionary<string, List<Matrix<double>>> AdamUpdate(double learningRate)
         {
             var wm = AverageMatrix(weightMatrixList);
             var bm = AverageMatrix(biasesMatrixList);
+            var deltaWeight = new List<Matrix<double>>();
+            var deltaBiases = new List<Matrix<double>>();
+            var delta = new Dictionary<string, List<Matrix<double>>>
+            {
+                { "weight", deltaWeight },
+                { "biases", deltaBiases }
+            };
             for (int i = 0; i < wm.Count; i++)
             {
                 CalculateMomentum(wm[i],bm[i],i);
                 CalculateSecondOrderMomentum(wm[i],bm[i],i);
-                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate*(MatrixItemDivision(preWeightMomentumList[i],Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
-                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * (MatrixItemDivision(preBiasesMomentumList[i] ,Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+                deltaWeight.Add(learningRate * (MatrixItemDivision(preWeightMomentumList[i], Matrix<double>.Sqrt(preSecWeightMomentumList[i] + SMOOTH_VALUE))));
+                deltaBiases.Add(learningRate * (MatrixItemDivision(preBiasesMomentumList[i], Matrix<double>.Sqrt(preSecBiasesMomentumList[i] + SMOOTH_VALUE))));
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - deltaWeight[i];
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - deltaBiases[i];
             }
             //清空平均矩阵资源
             weightMatrixList = new List<Matrix<double>[]>();
             biasesMatrixList = new List<Matrix<double>[]>();
+            return delta;
         }
 
         private void MomentumUpdate(double learningRate)
@@ -457,12 +492,14 @@ namespace NumberRecognition.Model.NeuronNet
             for (int i = 0; i < wm.Count; i++)
             {
                 CalculateSecondOrderMomentum(wm[i], bm[i], i);
-                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate * (MatrixItemDivision(wm[i], Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
-                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate * (MatrixItemDivision(bm[i], Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+                Connections[i].WeightMatrix = Connections[i].WeightMatrix - learningRate *
+                    (MatrixItemDivision(wm[i], Matrix<double>.Sqrt(preSecWeightMomentumList[i]) + SMOOTH_VALUE));
+                Connections[i].BiasesMatrix = Connections[i].BiasesMatrix - learningRate *
+                    (MatrixItemDivision(bm[i], Matrix<double>.Sqrt(preSecBiasesMomentumList[i]) + SMOOTH_VALUE));
+                //清空平均矩阵资源
+                weightMatrixList = new List<Matrix<double>[]>();
+                biasesMatrixList = new List<Matrix<double>[]>();
             }
-            //清空平均矩阵资源
-            weightMatrixList = new List<Matrix<double>[]>();
-            biasesMatrixList = new List<Matrix<double>[]>();
         }
 
         /// <summary>

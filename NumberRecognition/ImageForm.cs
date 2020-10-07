@@ -156,7 +156,7 @@ namespace NumberRecognition
             }));
         }
 
-        private void ImageForm_FormClosed(object sender, FormClosedEventArgs e)
+        private void ImageForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             Application.Exit();
         }

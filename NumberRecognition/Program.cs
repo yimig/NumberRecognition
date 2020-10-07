@@ -18,7 +18,7 @@ namespace NumberRecognition
     class Program
     {
 
-        private const int STEP = 2;
+        private const int MINIBATCH_SIZE = 1;
         private static FormChanger formChanger;
         static void Main(string[] args)
         {
@@ -26,48 +26,26 @@ namespace NumberRecognition
             var form = new ImageForm();
             formChanger = new FormChanger(form);
             (new Thread(formChanger.RunForm)).Start();
-            //LearnOnce(0);
             BeginLearning(0);
             //RunCmd2("shutdown", "-p");
             Console.ReadLine();
         }
 
-        private static void LearnOnce(int pos)
-        {
-            var net = ResultWriter.ReadResult();
-            var imb = new ImageBatch(DataReader.ReadTrainImage());
-            var lab = new LabelBatch(DataReader.ReadTrainLabel());
-            net.LoadSource(imb[pos], lab[pos]);
-            formChanger.ChangeImage(imb[pos].GetBitmap(),lab[pos]+"");
-            for (;;)
-            {
-                int say;
-                var res = net.BeginReason(out say);
-                Console.WriteLine(net.Evaluation());
-                var loss=net.Recall();
-                Console.WriteLine("5-Active:"+net.Layers[3][5].Active);
-                // Console.WriteLine("1-loss:" + loss[1]);
-                // Console.WriteLine("5-Active:" + net.Layers[3][5].Active);
-                // Console.WriteLine("5-loss:" + loss[5]);
-                net.Update(0.05,Net.UpdateOptimizer.Adam);
-            }
-        }
-
         private static void BeginLearning(int startPos)
         {
-            var ImageBatch = new ImageBatch(DataReader.ReadTrainImage());
-            var LabelBatch = new LabelBatch(DataReader.ReadTrainLabel());
+            var imageBatch = new ImageBatch(DataReader.ReadTrainImage());
+            var labelBatch = new LabelBatch(DataReader.ReadTrainLabel());
             var net = ResultWriter.ReadResult();
-            net.InitMomentumLists();
-            for (int x = startPos/STEP; x < (60000/STEP); x++)
+            //net.InitMomentumLists();
+            for (int x = startPos/MINIBATCH_SIZE; x < (60000/MINIBATCH_SIZE); x++)
             {
-                ResultWriter.WriteLog("start:" + x * STEP + " to " + (x * STEP + STEP) + "\n");
+                ResultWriter.WriteLog("start:" + x * MINIBATCH_SIZE + " to " + (x * MINIBATCH_SIZE + MINIBATCH_SIZE) + "\n");
                 for (; ; )
                 {
-                    var e=Learn(ImageBatch, LabelBatch, x, net);
-                    if (e / STEP < 0.01)
+                    var averageCost=Learn(imageBatch, labelBatch, x, net);//学习minibatch的一份
+                    if (averageCost < 0.01)
                     {
-                        ResultWriter.WriteLog("cost:" + e / STEP + "\n");
+                        ResultWriter.WriteLog("cost:" + averageCost + "\n");
                         break;
                     }
                 }
@@ -76,35 +54,40 @@ namespace NumberRecognition
 
         private static double Learn(ImageBatch imb,LabelBatch lab,int x,Net net)
         {
-            int CorrectNum = 0;
-            double e = 0;
-            for (int i = x * STEP; i < x * STEP + STEP; i++)
+            int correctNum = 0;
+            double costSum = 0;
+            for (int i = x * MINIBATCH_SIZE; i < x * MINIBATCH_SIZE + MINIBATCH_SIZE; i++)
             {
-                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")");
-                formChanger.SetInfo("index:" + (i + 1)+"  Load Picture");
-                net.LoadSource(imb[i], lab[i]);
-                formChanger.SetInfo("index:" + (i + 1) + "  Begin Reason");
-                int say;
-                var res=net.BeginReason(out say);
-                var cost=net.Evaluation();
-                formChanger.SetInfo("Ans:"+(res?"Correct": "Wrong")+"!    Say: "+say);
-                formChanger.SetInfo("Cost:"+cost);
-                formChanger.SetInfo("index:" + (i + 1)+"  Begin Recall");
+                formChanger.ChangeImage(imb[i].GetBitmap(),lab[i]+"     ("+(i+1)+"/"+imb.Count()+")"); 
+                net.LoadSource(imb[i], lab[i]);//载入样本
+                var isCorrect=net.BeginReason(out var say);//正推
+                var cost=net.Evaluation();//计算cost
+                costSum += cost;
                 formChanger.AddNeuronNote(net, lab[i], say, cost);
-                net.Recall();
-                e += cost;
-                if (res) CorrectNum++;
+                net.Recall();//反向传播
+                if (isCorrect) correctNum++;
+                PrintInForm(isCorrect,say,cost);
             }
-            //Console.WriteLine("=================================");
-            Console.WriteLine("Average Cost:" + e / STEP);
-            Console.WriteLine("Accuracy:"+Convert.ToDouble(CorrectNum)/STEP);
-            formChanger.AddCost(e / STEP, Convert.ToDouble(CorrectNum) / STEP);
-            Console.WriteLine("Learn Updating");
-            net.Update(0.05,Net.UpdateOptimizer.Adam);
-            Console.WriteLine("Saving Statue");
+
+            var averageCost = costSum / MINIBATCH_SIZE;
+            formChanger.AddCost(averageCost, Convert.ToDouble(correctNum) / MINIBATCH_SIZE);
+            net.Update(0.1, Net.UpdateOptimizer.SGD);
             ResultWriter.WriteResult(net);
+            PrintInConsole(averageCost,correctNum);
+            return averageCost;
+        }
+
+        private static void PrintInForm(bool isCorrect,int say,double cost)
+        {
+            formChanger.SetInfo("Ans:" + (isCorrect ? "Correct" : "Wrong") + "!    Say: " + say);
+            formChanger.SetInfo("Cost:" + cost);
+        }
+
+        private static void PrintInConsole(double averageCost,double correctNum)
+        {
+            Console.WriteLine("Average Cost:" + averageCost);
+            Console.WriteLine("Accuracy:" + Convert.ToDouble(correctNum) / MINIBATCH_SIZE);
             Console.WriteLine("=================================");
-            return e;
         }
 
         private static void BuildNewNet()
